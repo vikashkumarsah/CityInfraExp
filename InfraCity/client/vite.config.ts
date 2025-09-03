@@ -4,6 +4,9 @@ import { defineConfig } from "vite"
 
 export default defineConfig({
   plugins: [react()],
+  build:{
+    sourcemap:true
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -22,8 +25,7 @@ export default defineConfig({
       }
     },
     allowedHosts: [
-      'localhost',
-      '.pythagora.ai'
+      'localhost'
     ],
     watch: {
       ignored: ['**/node_modules/**', '**/dist/**', '**/public/**', '**/log/**']

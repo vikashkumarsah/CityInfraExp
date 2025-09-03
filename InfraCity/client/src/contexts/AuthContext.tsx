@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await apiLogin(email, password);
-      if (response?.refreshToken || response?.accessToken) {
+      if (response?.data.refreshToken || response?.data.accessToken) {
         localStorage.setItem("refreshToken", response.refreshToken);
         localStorage.setItem("accessToken", response.accessToken);
         setIsAuthenticated(true);

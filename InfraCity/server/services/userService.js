@@ -1,7 +1,7 @@
 const { randomUUID } = require('crypto');
 
 const User = require('../models/User');
-const { hashPassword, comparePassword } = require('../utils/password');
+const { generatePasswordHash, validatePassword } = require('../utils/password');
 
 // Add debugging at the top of the file
 console.log('=== UserService Loading Debug ===');
@@ -21,7 +21,7 @@ class UserService {
         return null;
       }
 
-      const isValidPassword = await comparePassword(password, user.password);
+      const isValidPassword = await validatePassword(password, user.password);
       if (!isValidPassword) {
         console.log('Invalid password for user:', email);
         return null;
@@ -43,7 +43,7 @@ class UserService {
         throw new Error('User already exists');
       }
 
-      const hashedPassword = await hashPassword(userData.password);
+      const hashedPassword = await generatePasswordHash(userData.password);
       const user = new User({
         ...userData,
         password: hashedPassword
