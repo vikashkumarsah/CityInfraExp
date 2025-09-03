@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -24,15 +24,30 @@ import {
   Eye,
   Plus,
   Edit,
-  Trash2
+  Trash2,
+  Loader2
 } from "lucide-react"
 import { useToast } from "@/hooks/useToast"
 import { format } from "date-fns"
+import {
+  createReport,
+  getReports,
+  getReportById,
+  updateReportStatus,
+  deleteReport,
+  getDashboardSummary,
+  downloadReport,
+  shareReport
+} from "@/api/reports"
 
 export function Reports() {
   const [selectedPeriod, setSelectedPeriod] = useState<Date | undefined>(new Date())
   const [reportType, setReportType] = useState('comprehensive')
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['issues', 'performance', 'budget'])
+  const [reports, setReports] = useState<any[]>([])
+  const [dashboardSummary, setDashboardSummary] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
   const { toast } = useToast()
 
   const reportTemplates = [
@@ -75,101 +90,174 @@ export function Reports() {
     { id: 'citizen', label: 'Citizen Feedback', description: 'Public reports, satisfaction scores, complaint resolution' }
   ]
 
-  const recentReports = [
-    {
-      id: '1',
-      title: 'Q4 2023 Infrastructure Summary',
-      type: 'Comprehensive',
-      generated: '2024-01-15',
-      author: 'System',
-      downloads: 45,
-      status: 'Published'
-    },
-    {
-      id: '2',
-      title: 'December Performance Review',
-      type: 'Performance',
-      generated: '2024-01-01',
-      author: 'John Smith',
-      downloads: 23,
-      status: 'Draft'
-    },
-    {
-      id: '3',
-      title: 'Year-End Budget Analysis',
-      type: 'Budget',
-      generated: '2023-12-31',
-      author: 'Jane Doe',
-      downloads: 67,
-      status: 'Published'
-    },
-    {
-      id: '4',
-      title: 'Public Progress Update - December',
-      type: 'Public',
-      generated: '2023-12-30',
-      author: 'Mike Johnson',
-      downloads: 156,
-      status: 'Published'
+  useEffect(() => {
+    fetchReports()
+    fetchDashboardSummary()
+  }, [])
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true)
+      console.log('Reports: Fetching reports')
+      const response = await getReports()
+      setReports(response.data.data.reports)
+      console.log('Reports: Loaded', response.data.data.reports.length, 'reports')
+    } catch (error: any) {
+      console.error('Reports: Error fetching reports:', error)
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-  ]
-
-  const scheduledReports = [
-    {
-      id: '1',
-      name: 'Weekly Performance Summary',
-      frequency: 'Weekly',
-      nextRun: '2024-01-22',
-      recipients: ['admin@city.gov', 'manager@city.gov'],
-      enabled: true
-    },
-    {
-      id: '2',
-      name: 'Monthly Infrastructure Report',
-      frequency: 'Monthly',
-      nextRun: '2024-02-01',
-      recipients: ['mayor@city.gov', 'council@city.gov'],
-      enabled: true
-    },
-    {
-      id: '3',
-      name: 'Quarterly Budget Analysis',
-      frequency: 'Quarterly',
-      nextRun: '2024-04-01',
-      recipients: ['finance@city.gov'],
-      enabled: false
-    }
-  ]
-
-  const handleGenerateReport = () => {
-    console.log('Reports: Generating report with config:', {
-      type: reportType,
-      period: selectedPeriod,
-      metrics: selectedMetrics
-    })
-
-    toast({
-      title: "Success",
-      description: "Report generation started. You'll be notified when it's ready.",
-    })
   }
 
-  const handleDownloadReport = (reportId: string) => {
-    console.log('Reports: Downloading report:', reportId)
-    toast({
-      title: "Success",
-      description: "Report download started",
-    })
+  const fetchDashboardSummary = async () => {
+    try {
+      console.log('Reports: Fetching dashboard summary')
+      const response = await getDashboardSummary()
+      setDashboardSummary(response.data.data)
+      console.log('Reports: Dashboard summary loaded')
+    } catch (error: any) {
+      console.error('Reports: Error fetching dashboard summary:', error)
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleShareReport = (reportId: string) => {
-    console.log('Reports: Sharing report:', reportId)
-    const shareLink = `${window.location.origin}/reports/shared/${reportId}`
-    navigator.clipboard.writeText(shareLink)
-    toast({
-      title: "Success",
-      description: "Share link copied to clipboard",
-    })
+  const handleGenerateReport = async () => {
+    try {
+      setGenerating(true)
+      console.log('Reports: Generating report with config:', {
+        type: reportType,
+        period: selectedPeriod,
+        metrics: selectedMetrics
+      })
+
+      const reportData = {
+        type: reportType,
+        metrics: selectedMetrics,
+        period: {
+          preset: 'custom',
+          startDate: selectedPeriod ? new Date(selectedPeriod.getTime() - 30 * 24 * 60 * 60 * 1000) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          endDate: selectedPeriod || new Date()
+        },
+        format: 'pdf'
+      }
+
+      const response = await createReport(reportData)
+      
+      toast({
+        title: "Success",
+        description: "Report generation started. You'll be notified when it's ready.",
+      })
+
+      // Refresh reports list
+      await fetchReports()
+      await fetchDashboardSummary()
+      
+      console.log('Reports: Report generation started:', response.data.data.reportId)
+    } catch (error: any) {
+      console.error('Reports: Error generating report:', error)
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleDownloadReport = async (reportId: string) => {
+    try {
+      console.log('Reports: Downloading report:', reportId)
+      await downloadReport(reportId)
+      
+      toast({
+        title: "Success",
+        description: "Report download started",
+      })
+    } catch (error: any) {
+      console.error('Reports: Error downloading report:', error)
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleShareReport = async (reportId: string) => {
+    try {
+      console.log('Reports: Sharing report:', reportId)
+      const response = await shareReport(reportId, { isPublic: true })
+      
+      const shareLink = `${window.location.origin}/reports/shared/${reportId}`
+      navigator.clipboard.writeText(shareLink)
+      
+      toast({
+        title: "Success",
+        description: "Share link copied to clipboard",
+      })
+    } catch (error: any) {
+      console.error('Reports: Error sharing report:', error)
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteReport = async (reportId: string) => {
+    try {
+      console.log('Reports: Deleting report:', reportId)
+      await deleteReport(reportId)
+      
+      toast({
+        title: "Success",
+        description: "Report deleted successfully",
+      })
+
+      // Refresh reports list
+      await fetchReports()
+      await fetchDashboardSummary()
+    } catch (error: any) {
+      console.error('Reports: Error deleting report:', error)
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateStatus = async (reportId: string, status: string) => {
+    try {
+      console.log('Reports: Updating report status:', reportId, 'to', status)
+      await updateReportStatus(reportId, status)
+      
+      toast({
+        title: "Success",
+        description: "Report status updated",
+      })
+
+      // Refresh reports list
+      await fetchReports()
+    } catch (error: any) {
+      console.error('Reports: Error updating report status:', error)
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -181,10 +269,15 @@ export function Reports() {
         </div>
         <Button
           onClick={handleGenerateReport}
+          disabled={generating}
           className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
         >
-          <FileText className="w-4 h-4 mr-2" />
-          Generate Report
+          {generating ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <FileText className="w-4 h-4 mr-2" />
+          )}
+          {generating ? 'Generating...' : 'Generate Report'}
         </Button>
       </div>
 
@@ -364,31 +457,33 @@ export function Reports() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/50 dark:border-slate-700/50">
-                <CardHeader>
-                  <CardTitle>Quick Stats</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Total Issues</span>
-                      <span className="font-medium">247</span>
+              {dashboardSummary && (
+                <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/50 dark:border-slate-700/50">
+                  <CardHeader>
+                    <CardTitle>Quick Stats</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm">Total Reports</span>
+                        <span className="font-medium">{dashboardSummary.totalReports}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Completed Reports</span>
+                        <span className="font-medium text-green-600">{dashboardSummary.completedReports}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Published Reports</span>
+                        <span className="font-medium">{dashboardSummary.publishedReports}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Total Downloads</span>
+                        <span className="font-medium text-blue-600">{dashboardSummary.totalDownloads}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Resolved This Month</span>
-                      <span className="font-medium text-green-600">189</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Active Tasks</span>
-                      <span className="font-medium">58</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Team Efficiency</span>
-                      <span className="font-medium text-blue-600">87%</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -400,50 +495,90 @@ export function Reports() {
               <CardDescription>Access and manage previously generated reports</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentReports.map((report) => (
-                  <div key={report.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium">{report.title}</h4>
-                        <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
-                          <span>{report.type}</span>
-                          <span>•</span>
-                          <span>Generated {report.generated}</span>
-                          <span>•</span>
-                          <span>By {report.author}</span>
-                          <span>•</span>
-                          <span>{report.downloads} downloads</span>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reports.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                      <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No reports generated yet</p>
+                      <Button className="mt-4" variant="outline" onClick={handleGenerateReport}>
+                        Generate Your First Report
+                      </Button>
+                    </div>
+                  ) : (
+                    reports.map((report) => (
+                      <div key={report._id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium">{report.title}</h4>
+                            <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
+                              <span className="capitalize">{report.type}</span>
+                              <span>•</span>
+                              <span>Generated {format(new Date(report.createdAt), 'MMM dd, yyyy')}</span>
+                              <span>•</span>
+                              <span>By {report.createdBy?.name || 'System'}</span>
+                              <span>•</span>
+                              <span>{report.metadata?.downloadCount || 0} downloads</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={report.status === 'completed' || report.status === 'published' ? 'default' : 
+                                        report.status === 'generating' ? 'secondary' : 'destructive'}>
+                            {report.status === 'generating' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                            {report.status}
+                          </Badge>
+                          {report.status === 'completed' || report.status === 'published' ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadReport(report._id)}
+                              >
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleShareReport(report._id)}
+                              >
+                                <Share className="w-4 h-4 mr-2" />
+                                Share
+                              </Button>
+                            </>
+                          ) : null}
+                          {report.status === 'draft' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateStatus(report._id, 'published')}
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              Publish
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteReport(report._id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={report.status === 'Published' ? 'default' : 'secondary'}>
-                        {report.status}
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadReport(report.id)}
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleShareReport(report.id)}
-                      >
-                        <Share className="w-4 h-4 mr-2" />
-                        Share
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    ))
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -486,7 +621,9 @@ export function Reports() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                          <div className="text-2xl font-bold text-green-600">189</div>
+                          <div className="text-2xl font-bold text-green-600">
+                            {dashboardSummary?.completedReports || 189}
+                          </div>
                           <div className="text-sm">Issues Resolved</div>
                         </div>
                         <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -524,37 +661,12 @@ export function Reports() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {scheduledReports.map((schedule) => (
-                  <div key={schedule.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-3 h-3 rounded-full ${schedule.enabled ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                      <div>
-                        <h4 className="font-medium">{schedule.name}</h4>
-                        <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
-                          <span>{schedule.frequency}</span>
-                          <span>•</span>
-                          <span>Next run: {schedule.nextRun}</span>
-                          <span>•</span>
-                          <span>{schedule.recipients.length} recipients</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={schedule.enabled ? 'default' : 'secondary'}>
-                        {schedule.enabled ? 'Active' : 'Disabled'}
-                      </Badge>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No scheduled reports configured</p>
+                <Button className="mt-4" variant="outline">
+                  Create Schedule
+                </Button>
               </div>
             </CardContent>
           </Card>

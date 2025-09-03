@@ -1,64 +1,76 @@
 const express = require('express');
-const UserService = require('../services/userService.js');
-const { requireUser } = require('./middleware/auth.js');
-
 const router = express.Router();
+const UserService = require('../services/userService');
+const authMiddleware = require('./middleware/auth');
 
 // Get current user profile
-router.get('/me', requireUser, async (req, res) => {
+router.get('/profile', authMiddleware, async (req, res) => {
+  console.log('GET /api/users/profile - Fetching profile for user:', req.user.id);
+
   try {
-    console.log(`Profile retrieved for user: ${req.user.email}`);
-    return res.status(200).json({
+    const userService = new UserService();
+    const user = await userService.get(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    console.log('GET /api/users/profile - Profile fetched successfully');
+
+    res.json({
       success: true,
-      data: req.user
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt
+        }
+      }
     });
   } catch (error) {
-    console.error(`Profile retrieval error: ${error.message}`);
-    return res.status(500).json({ 
+    console.error('GET /api/users/profile - Error:', error);
+    res.status(500).json({
       success: false,
-      message: 'Failed to retrieve profile' 
+      error: error.message
     });
   }
 });
 
 // Update current user profile
-router.put('/me', requireUser, async (req, res) => {
+router.put('/profile', authMiddleware, async (req, res) => {
+  console.log('PUT /api/users/profile - Updating profile for user:', req.user.id);
+
   try {
-    const { firstName, lastName, department, phone } = req.body;
-    
-    // Validate required fields
-    if (!firstName || !lastName) {
-      return res.status(400).json({
-        success: false,
-        message: 'First name and last name are required'
-      });
-    }
+    const userService = new UserService();
+    const updatedUser = await userService.update(req.user.id, req.body);
 
-    const updatedUser = await UserService.update(req.user._id, {
-      firstName,
-      lastName,
-      department: department || '',
-      phone: phone || ''
-    });
+    console.log('PUT /api/users/profile - Profile updated successfully');
 
-    if (!updatedUser) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    console.log(`Profile updated for user: ${updatedUser.email}`);
-    return res.status(200).json({
+    res.json({
       success: true,
-      data: updatedUser,
-      message: 'Profile updated successfully'
+      message: 'Profile updated successfully',
+      data: {
+        user: {
+          id: updatedUser._id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          createdAt: updatedUser.createdAt,
+          updatedAt: updatedUser.updatedAt
+        }
+      }
     });
   } catch (error) {
-    console.error(`Profile update error: ${error.message}`);
-    return res.status(500).json({
+    console.error('PUT /api/users/profile - Error:', error);
+    res.status(500).json({
       success: false,
-      message: 'Failed to update profile'
+      error: error.message
     });
   }
 });

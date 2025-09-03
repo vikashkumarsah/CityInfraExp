@@ -35,9 +35,12 @@ try {
   process.exit(1);
 }
 
+// Declare variables at top level
+let mongoose, express, session, MongoStore, cors;
+
 try {
   console.log('Loading mongoose...');
-  const mongoose = require("mongoose");
+  mongoose = require("mongoose");
   console.log('Mongoose loaded successfully');
 } catch (error) {
   console.error('Error loading mongoose:', error);
@@ -46,7 +49,7 @@ try {
 
 try {
   console.log('Loading express...');
-  const express = require("express");
+  express = require("express");
   console.log('Express loaded successfully');
 } catch (error) {
   console.error('Error loading express:', error);
@@ -55,9 +58,9 @@ try {
 
 try {
   console.log('Loading other dependencies...');
-  const session = require("express-session");
-  const MongoStore = require('connect-mongo');
-  const cors = require("cors");
+  session = require("express-session");
+  MongoStore = require('connect-mongo');
+  cors = require("cors");
   console.log('Other dependencies loaded successfully');
 } catch (error) {
   console.error('Error loading dependencies:', error);
@@ -79,6 +82,7 @@ try {
   const taskRoutes = require("./routes/taskRoutes");
   const analyticsRoutes = require("./routes/analyticsRoutes");
   const planningSessionRoutes = require("./routes/planningSessionRoutes");
+  const reportRoutes = require("./routes/reportRoutes");
   console.log('Route modules loaded successfully');
 } catch (error) {
   console.error('Error loading route modules:', error);
@@ -164,6 +168,8 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/analytics', analyticsRoutes);
 // Planning Session Routes
 app.use('/api/planning-sessions', planningSessionRoutes);
+// Report Routes
+app.use('/api/reports', reportRoutes);
 
 // If no routes handled the request, it's a 404
 app.use((req, res, next) => {
