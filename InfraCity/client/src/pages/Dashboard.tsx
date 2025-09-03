@@ -14,19 +14,25 @@ import {
   Car,
   Construction,
   Trash2,
-  Navigation
+  Navigation,
+  BarChart3,
+  Route
 } from "lucide-react"
 import { getInfrastructureOverview, getRoadSegments, getTrafficData } from "@/api/infrastructure"
 import { useToast } from "@/hooks/useToast"
 import { MapView } from "@/components/MapView"
 import { MetricsPanel } from "@/components/MetricsPanel"
 import { RecentIssues } from "@/components/RecentIssues"
+import { DataVisualization } from "@/components/DataVisualization"
+import { InteractiveMap } from "@/components/InteractiveMap"
 
 export function Dashboard() {
   const [overview, setOverview] = useState<any>(null)
   const [roads, setRoads] = useState<any>(null)
   const [traffic, setTraffic] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [activeView, setActiveView] = useState('overview')
+  const [mapMode, setMapMode] = useState<'overview' | 'traffic'>('overview')
   const { toast } = useToast()
 
   useEffect(() => {
@@ -73,59 +79,108 @@ export function Dashboard() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Infrastructure Dashboard</h1>
           <p className="text-slate-600 dark:text-slate-400">Real-time city infrastructure monitoring and management</p>
         </div>
-        <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
-          <MapPin className="w-4 h-4 mr-2" />
-          View Full Map
-        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            variant={activeView === 'overview' ? 'default' : 'outline'}
+            onClick={() => {
+              setActiveView('overview')
+              setMapMode('overview')
+            }}
+            className={activeView === 'overview' ? 'bg-gradient-to-r from-blue-500 to-indigo-600' : ''}
+          >
+            <MapPin className="w-4 h-4 mr-2" />
+            Map View
+          </Button>
+          <Button 
+            variant={mapMode === 'traffic' ? 'default' : 'outline'}
+            onClick={() => {
+              setActiveView('overview')
+              setMapMode('traffic')
+            }}
+            className={mapMode === 'traffic' ? 'bg-gradient-to-r from-green-500 to-emerald-600' : ''}
+          >
+            <Route className="w-4 h-4 mr-2" />
+            Traffic Mode
+          </Button>
+          <Button 
+            variant={activeView === 'analytics' ? 'default' : 'outline'}
+            onClick={() => setActiveView('analytics')}
+            className={activeView === 'analytics' ? 'bg-gradient-to-r from-purple-500 to-pink-600' : ''}
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Analytics
+          </Button>
+        </div>
       </div>
 
       <MetricsPanel overview={overview} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/50 dark:border-slate-700/50">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <MapPin className="w-5 h-5 mr-2 text-blue-600" />
-                Interactive City Map
-              </CardTitle>
-              <CardDescription>
-                Real-time infrastructure status and issue locations
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MapView roads={roads} traffic={traffic} />
-            </CardContent>
-          </Card>
-        </div>
+      {activeView === 'overview' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/50 dark:border-slate-700/50">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <MapPin className="w-5 h-5 mr-2 text-blue-600" />
+                  Interactive City Map
+                  {mapMode === 'traffic' && <Badge className="ml-2 bg-green-500">Traffic Analysis Mode</Badge>}
+                </CardTitle>
+                <CardDescription>
+                  {mapMode === 'traffic' 
+                    ? 'Real-time traffic flow and intersection analysis'
+                    : 'Real-time infrastructure status and issue locations'
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InteractiveMap 
+                  roads={roads} 
+                  traffic={traffic} 
+                  mode={mapMode}
+                  onLocationSelect={(location) => {
+                    console.log('Selected location:', location)
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
 
-        <div className="space-y-6">
-          <RecentIssues issues={overview?.recentIssues || []} />
-          
-          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/50 dark:border-slate-700/50">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-start">
-                <Construction className="w-4 h-4 mr-2" />
-                Create Maintenance Task
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Navigation className="w-4 h-4 mr-2" />
-                Optimize Routes
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Users className="w-4 h-4 mr-2" />
-                Assign Crew
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <RecentIssues issues={overview?.recentIssues || []} />
+            
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/50 dark:border-slate-700/50">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-start">
+                  <Construction className="w-4 h-4 mr-2" />
+                  Create Maintenance Task
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Navigation className="w-4 h-4 mr-2" />
+                  Optimize Routes
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Users className="w-4 h-4 mr-2" />
+                  Assign Crew
+                </Button>
+                {mapMode === 'traffic' && (
+                  <Button variant="outline" className="w-full justify-start">
+                    <Route className="w-4 h-4 mr-2" />
+                    Traffic Analysis
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      ) : (
+        <DataVisualization data={{ overview, roads, traffic }} />
+      )}
 
       <Tabs defaultValue="roads" className="space-y-4">
         <TabsList className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
